@@ -31,13 +31,14 @@ import (
 )
 
 const (
+	// Program is the name of the this program
 	Program = "my-i3statusbar"
 
+	// padding is the amount of padding each segment should have
 	padding = 25
 )
 
-// RunRight executes the given command on a left-click. This is a shortcut for
-// click.Right(func(){exec.Command(cmd).Run()}).
+// RunRight executes the given command on a right-click.
 func RunRight(cmd string, args ...string) func(bar.Event) {
 	return click.Right(func() {
 		log.Printf("Executing %s %s on right click", cmd, strings.Join(args, " "))
@@ -45,6 +46,7 @@ func RunRight(cmd string, args ...string) func(bar.Event) {
 	})
 }
 
+// RunLeft executes the given command on a left-click.
 func RunLeft(cmd string, args ...string) func(bar.Event) {
 	return click.Left(func() {
 		log.Printf("Executing %s %s on left click", cmd, strings.Join(args, " "))
@@ -52,6 +54,7 @@ func RunLeft(cmd string, args ...string) func(bar.Event) {
 	})
 }
 
+// sudo runs the command as sudo and returns if there is an error or not.
 func sudo(cmd string, args... string) error {
 	sudo := "sudo"
 	log.Printf("Executing %s %s %s", sudo, cmd, strings.Join(args, " "))
@@ -64,6 +67,7 @@ func sudo(cmd string, args... string) error {
 	return nil
 }
 
+// dhclient runs `dhclient` with the given args
 func dhclient(args... string) error {
 	dhclient := "/usr/sbin/dhclient"
 	err := sudo(dhclient, args...)
@@ -73,6 +77,7 @@ func dhclient(args... string) error {
 	return nil
 }
 
+// wpaSupplicant runs `wpaSupplicant` for the given `config` and interface `iface`.
 func wpaSupplicant(config, iface string) error {
 	wpaSupplicant := "/usr/sbin/wpa_supplicant"
 	err := sudo(wpaSupplicant, "-c", config, "-i", iface, "-B")
@@ -82,13 +87,14 @@ func wpaSupplicant(config, iface string) error {
 	return nil
 }
 
+// pkill kills processes based on the given `pattern`.
 func pkill(pattern string) error {
 	pkill := "/usr/bin/pkill"
 	_ = sudo(pkill, pattern)
 	return nil
 }
 
-
+// startWifi starts the wifi with `config` on interface `iface`.
 func startWifi(config, iface string) error {
 	log.Printf("Starting wifi...")
 	if err := wpaSupplicant(config, iface); err != nil {
@@ -104,6 +110,7 @@ func startWifi(config, iface string) error {
 	return nil
 }
 
+// stopWifi stops the wifi.
 func stopWifi() error {
 	log.Printf("Stopping wifi...")
 	if err := dhclient("-r"); err != nil {
@@ -119,6 +126,8 @@ func stopWifi() error {
 	return nil
 }
 
+
+// restartWifi stops the wifi then starts it again.
 func restartWifi(config, iface string) {
 	log.Printf("Restarting wifi...")
 	if err := stopWifi(); err != nil {
@@ -132,7 +141,7 @@ func restartWifi(config, iface string) {
 	log.Printf("Wifi restarted")
 }
 
-func main() {
+func init() {
 	logDir := filepath.Join(os.Getenv("HOME"), ".local", "share", Program)
 	if fileInfo, err := os.Stat(logDir); os.IsNotExist(err) {
 		log.Printf("Creating %s as it does not exist", logDir)
@@ -145,18 +154,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error: Could not open %s: %v", logFile, err)
 	}
-	defer f.Close()
-
 	log.SetOutput(f)
+}
 
+func main() {
 	log.Printf(`
 ================================================================================
-	                           Started %s", Program
+	                           Started %s
 ================================================================================
 `, Program)
 	defer log.Printf(`
 ================================================================================
-	                           Stopped %s", Program
+	                           Stopped %s
 ================================================================================
 `, Program)
 
@@ -250,8 +259,6 @@ func main() {
 						log.Printf("Event button %v not handled", event.Button)
 					}
 				})
-				// OnClick(click.Left(func() { restartWifi(*config, *iface) })).
-				// OnClick(click.Right(func() { stopWifi() }))
 		case w.Connecting():
 			return outputs.Text("W: connecting...").
 				Color(colors.Scheme("degraded")).
@@ -295,10 +302,7 @@ func main() {
 			return nil
 		}
 
-		out := outputs.Textf("Bat: %d%% (%s)",
-			b.RemainingPct(),
-			statusName[b.Status],
-		)
+		out := outputs.Textf("Bat: %d%% (%s)", b.RemainingPct(), statusName[b.Status])
 		if b.Discharging() {
 			if b.RemainingPct() < 20 || b.RemainingTime() < 30*time.Minute {
 				out.Color(colors.Scheme("bad"))
@@ -309,7 +313,7 @@ func main() {
 
 	barista.Add(clock.Local().Output(time.Second, func(t time.Time) bar.Output {
 		fmtdTime := t.Format("2006-01-02 15:04:05  ")
-		return outputs.Text(fmtdTime)
+		return outputs.Text(fmtdTime).OnClick(RunLeft("gnome-calendar"))
 	}))
 
 	panic(barista.Run())
